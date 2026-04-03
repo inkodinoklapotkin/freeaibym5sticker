@@ -6,7 +6,6 @@
     <meta name="theme-color" content="#0a0a0a">
     <title>AI by M5sticker</title>
     <style>
-        /* ВСЕ СТИЛИ ОСТАЮТСЯ ТЕМИ ЖЕ — СКОПИРУЙТЕ ИЗ ВАШЕГО HTML */
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', sans-serif; background: #050505; min-height: 100vh; color: #fff; }
         .app { max-width: 1600px; margin: 0 auto; padding: 20px; }
@@ -54,16 +53,137 @@
         .templates-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 16px; }
         .template-card { background: rgba(25,25,38,0.7); border-radius: 24px; padding: 10px; cursor: pointer; text-align: center; font-size: 0.7rem; transition: 0.2s; }
         .template-card:hover { background: #6366f1; transform: translateY(-2px); }
+        
+        /* Модальное окно */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(10px);
+            z-index: 100000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-container {
+            background: rgba(30, 30, 45, 0.95);
+            border-radius: 48px;
+            padding: 40px;
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            border: 0.5px solid rgba(255,255,255,0.1);
+        }
+        .modal-container h2 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #fff, #a5b4fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .modal-container input {
+            width: 100%;
+            padding: 14px 18px;
+            margin: 12px 0;
+            background: rgba(20, 20, 30, 0.9);
+            border: 0.5px solid rgba(255,255,255,0.1);
+            border-radius: 32px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+        }
+        .modal-container input:focus { border-color: #6366f1; }
+        .modal-btn {
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            border: none;
+            color: white;
+            padding: 14px 24px;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .modal-switch {
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            cursor: pointer;
+        }
+        .modal-switch span { color: #a5b4fc; text-decoration: underline; }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(99, 102, 241, 0.2);
+            padding: 8px 16px;
+            border-radius: 40px;
+            margin-top: 16px;
+        }
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: #6366f1;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .logout-btn {
+            background: rgba(239, 68, 68, 0.2);
+            border: none;
+            color: #f87171;
+            padding: 4px 12px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            margin-left: auto;
+        }
+        .loading-text {
+            color: #a5b4fc;
+            font-size: 0.8rem;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
-<div class="app">
+
+<div id="authModal" class="modal-overlay">
+    <div class="modal-container">
+        <div style="font-size: 48px; margin-bottom: 10px;">🔐</div>
+        <h2>Добро пожаловать в AI By M5sticker</h2>
+        <p style="color: #94a3b8; margin-bottom: 20px;">Войдите или зарегистрируйтесь</p>
+        
+        <div id="loginForm">
+            <input type="text" id="loginUsername" placeholder="Имя пользователя или Email">
+            <input type="password" id="loginPassword" placeholder="Пароль">
+            <button class="modal-btn" onclick="handleLogin()">🔓 Войти</button>
+            <div class="modal-switch" onclick="switchToRegister()">Нет аккаунта? <span>Зарегистрироваться</span></div>
+        </div>
+        
+        <div id="registerForm" style="display: none;">
+            <input type="text" id="regUsername" placeholder="Имя пользователя">
+            <input type="email" id="regEmail" placeholder="Email">
+            <input type="password" id="regPassword" placeholder="Пароль">
+            <button class="modal-btn" onclick="handleRegister()">📝 Зарегистрироваться</button>
+            <div class="modal-switch" onclick="switchToLogin()">Уже есть аккаунт? <span>Войти</span></div>
+        </div>
+        <div id="authMessage" class="loading-text"></div>
+    </div>
+</div>
+
+<div class="app" id="mainApp" style="display: none;">
     <div class="dashboard">
         <div class="sidebar">
             <div style="text-align: center; margin-bottom: 16px;">
                 <div class="logo" style="margin: 0 auto 12px auto;">✨</div>
                 <h3 style="font-weight: 600;">AI Ultra</h3>
-                <div class="badge" style="display: inline-block; margin-top: 6px;"></div>
+                <div class="badge" style="display: inline-block; margin-top: 6px;" id="userBadge"></div>
             </div>
 
             <div class="tabs">
@@ -73,15 +193,15 @@
 
             <div id="chatTab" class="tab-content active">
                 <div class="section-title">🤖 МОДЕЛИ</div>
-    <select id="modelSelect" class="model-select">
-    <optgroup label="🔥 Groq (бесплатно, 30 запросов/мин)">
-        <option value="llama-3.3-70b-versatile">🦙 Llama 3.3 70B</option>
-        <option value="llama-3.1-8b-instant">⚡ Llama 3.1 8B (быстрый)</option>
-        <option value="openai/gpt-oss-120b">🧠 GPT-OSS 120B</option>
-        <option value="qwen/qwen3-32b">🐉 Qwen 3 32B</option>
-        <option value="groq/compound">🧪 Groq Compound</option>
-        <option value="groq/compound-mini">🔬 Groq Mini</option>
-                </optgroup>
+                <select id="modelSelect" class="model-select">
+                    <optgroup label="🔥 Groq (бесплатно, 30 запросов/мин)">
+                        <option value="llama-3.3-70b-versatile">🦙 Llama 3.3 70B</option>
+                        <option value="llama-3.1-8b-instant">⚡ Llama 3.1 8B (быстрый)</option>
+                        <option value="openai/gpt-oss-120b">🧠 GPT-OSS 120B</option>
+                        <option value="qwen/qwen3-32b">🐉 Qwen 3 32B</option>
+                        <option value="groq/compound">🧪 Groq Compound</option>
+                        <option value="groq/compound-mini">🔬 Groq Mini</option>
+                    </optgroup>
                 </select>
 
                 <div class="section-title">🎭 РЕЖИМ</div>
@@ -137,6 +257,12 @@
                 <div style="font-size: 0.8rem; opacity: 0.7; margin: 8px 0;">Крутой канал про пентест</div>
                 <a href="https://t.me/m5sticker2" target="_blank" class="tg-button">📱 Telegram канал @m5sticker2</a>
             </div>
+            
+            <div class="user-info">
+                <div class="user-avatar">👤</div>
+                <span id="userNameDisplay">Пользователь</span>
+                <button class="logout-btn" onclick="logout()">🚪 Выйти</button>
+            </div>
         </div>
 
         <div class="chat-main">
@@ -150,7 +276,7 @@
             <div class="messages-area" id="messagesContainer">
                 <div class="message assistant">
                     <div class="avatar">✨</div>
-                    <div class="bubble">Привет!<strong>✨ ты лучший!✨ </strong>Выбирай модель и задавай вопросы!</div>
+                    <div class="bubble">Привет! <strong>✨ ты лучший! ✨</strong> Выбирай модель и задавай вопросы!</div>
                 </div>
             </div>
             <div class="input-panel">
@@ -164,10 +290,124 @@
 </div>
 
 <script>
+    // ========== БЭКЕНД ==========
+    // ⚠️ ЗАМЕНИТЕ НА ВАШ URL WORKER С D1!
+    const BACKEND_URL = 'https://round-firefly-edb2.inkodinoklapotkin.workers.dev';
+    
+    let currentUser = null;
+    
+    async function handleRegister() {
+        const username = document.getElementById('regUsername').value.trim();
+        const email = document.getElementById('regEmail').value.trim();
+        const password = document.getElementById('regPassword').value;
+        const msgDiv = document.getElementById('authMessage');
+        
+        if (!username || !email || !password) {
+            msgDiv.innerText = '❌ Заполните все поля!';
+            return;
+        }
+        
+        msgDiv.innerText = '⏳ Регистрация...';
+        
+        try {
+            const response = await fetch(`${BACKEND_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                msgDiv.innerText = '✅ Регистрация успешна! Теперь войдите.';
+                setTimeout(() => switchToLogin(), 1500);
+            } else {
+                msgDiv.innerText = `❌ ${data.error}`;
+            }
+        } catch (error) {
+            msgDiv.innerText = `❌ Ошибка: ${error.message}`;
+        }
+    }
+    
+    async function handleLogin() {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const msgDiv = document.getElementById('authMessage');
+        
+        if (!username || !password) {
+            msgDiv.innerText = '❌ Введите имя пользователя и пароль!';
+            return;
+        }
+        
+        msgDiv.innerText = '⏳ Вход...';
+        
+        try {
+            const response = await fetch(`${BACKEND_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                currentUser = data.user;
+                localStorage.setItem('current_user', JSON.stringify(currentUser));
+                
+                document.getElementById('authModal').style.display = 'none';
+                document.getElementById('mainApp').style.display = 'block';
+                document.getElementById('userNameDisplay').innerText = currentUser.username;
+                document.getElementById('userBadge').innerHTML = `👤 ${currentUser.username}`;
+                
+                loadStats();
+                loadChatsLocal();
+                updateUniqueUsers();
+            } else {
+                msgDiv.innerText = `❌ ${data.error}`;
+            }
+        } catch (error) {
+            msgDiv.innerText = `❌ Ошибка: ${error.message}`;
+        }
+    }
+    
+    function switchToRegister() {
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'block';
+        document.getElementById('authMessage').innerText = '';
+    }
+    
+    function switchToLogin() {
+        document.getElementById('registerForm').style.display = 'none';
+        document.getElementById('loginForm').style.display = 'block';
+        document.getElementById('authMessage').innerText = '';
+    }
+    
+    function logout() {
+        currentUser = null;
+        localStorage.removeItem('current_user');
+        document.getElementById('mainApp').style.display = 'none';
+        document.getElementById('authModal').style.display = 'flex';
+        document.getElementById('loginUsername').value = '';
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('regUsername').value = '';
+        document.getElementById('regEmail').value = '';
+        document.getElementById('regPassword').value = '';
+        document.getElementById('authMessage').innerText = '';
+        switchToLogin();
+    }
+    
+    // Проверяем авторизацию
+    const savedUser = localStorage.getItem('current_user');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        document.getElementById('authModal').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        document.getElementById('userNameDisplay').innerText = currentUser.username;
+        document.getElementById('userBadge').innerHTML = `👤 ${currentUser.username}`;
+    }
+
     // ========== КОНФИГУРАЦИЯ ==========
-    // ⚠️ КЛЮЧЕЙ ЗДЕСЬ НЕТ! Они в Cloudflare Worker.
     const PROXY_URL = 'https://groq-proxybyinkodinok.inkodinoklapotkin.workers.dev';
-    const OPENROUTER_PROXY_URL = 'https://young-cake-3652.inkodinoklapotkin.workers.dev'; // ← ЗАМЕНИТЕ НА ВАШ URL
     
     let currentModel = 'llama-3.3-70b-versatile';
     let currentMode = 'general';
@@ -188,7 +428,6 @@
     
     let conversationHistory = [];
 
-    // DOM элементы
     const messagesContainer = document.getElementById('messagesContainer');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -221,7 +460,6 @@
         creative: 'Ты креативный писатель. Генерируй идеи, пиши красиво.'
     };
 
-    // ========== УВЕДОМЛЕНИЯ ==========
     async function requestNotificationPermission() {
         if (!('Notification' in window)) return false;
         if (Notification.permission === 'granted') return true;
@@ -262,8 +500,8 @@
         }
     }
 
-    // ========== СТАТИСТИКА ==========
     function getUserId() {
+        if (currentUser) return currentUser.username;
         let id = localStorage.getItem('user_id');
         if (!id) {
             id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -280,6 +518,7 @@
             localStorage.setItem('all_users', JSON.stringify(users));
         }
         stats.uniqueUsers = users;
+        if (uniqueUsersStat) uniqueUsersStat.innerText = stats.uniqueUsers.length;
     }
 
     function updateDailyStats() {
@@ -324,11 +563,11 @@
 
     function updateAvgTime() {
         if (stats.responseTimes.length === 0) {
-            avgTimeStat.innerText = '0 сек';
+            if (avgTimeStat) avgTimeStat.innerText = '0 сек';
             return;
         }
         const avg = stats.responseTimes.reduce((a, b) => a + b, 0) / stats.responseTimes.length;
-        avgTimeStat.innerText = (avg / 1000).toFixed(1) + ' сек';
+        if (avgTimeStat) avgTimeStat.innerText = (avg / 1000).toFixed(1) + ' сек';
     }
 
     function renderTopQueries() {
@@ -364,13 +603,13 @@
     }
 
     function updateStatsUI() {
-        totalMsgStat.innerText = stats.messageCount;
-        uniqueUsersStat.innerText = stats.uniqueUsers.length;
+        if (totalMsgStat) totalMsgStat.innerText = stats.messageCount;
+        if (uniqueUsersStat) uniqueUsersStat.innerText = stats.uniqueUsers.length;
         const today = new Date().toDateString();
-        todayMsgStat.innerText = stats.dailyMessages[today] || 0;
+        if (todayMsgStat) todayMsgStat.innerText = stats.dailyMessages[today] || 0;
         let topModel = Object.entries(stats.modelUsage).sort((a,b) => b[1] - a[1])[0];
-        if(topModel) topModelStat.innerText = topModel[0].substring(0, 20);
-        else topModelStat.innerText = "—";
+        if(topModel && topModelStat) topModelStat.innerText = topModel[0].substring(0, 20);
+        else if(topModelStat) topModelStat.innerText = "—";
         updateAvgTime();
         renderTopQueries();
         renderHourlyActivity();
@@ -432,59 +671,61 @@
         updateHourlyStats();
         updateStatsUI();
         saveStats();
-    }
-
-    // ========== ЗАПРОСЫ К РАЗНЫМ API (КЛЮЧИ В WORKER) ==========
-    async function callGroq(messages) {
-        const response = await fetch(PROXY_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: currentModel, messages: messages, temperature: 0.7, max_tokens: 1000 })
-        });
-        if(!response.ok) throw new Error('Groq error');
-        const data = await response.json();
-        stats.totalTokens += data.usage?.total_tokens || 0;
-        saveStats();
-        return data.choices[0].message.content;
-    }
-
-    async function callClaude(messages) {
-        // Ключ в Worker! Безопасно!
-        const response = await fetch(OPENROUTER_PROXY_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: currentModel,
-                messages: messages,
-                max_tokens: 2000,
-                temperature: 0.7
-            })
-        });
-        if(!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Claude proxy error');
+        
+        // Обновляем статистику в бэкенде
+        if (currentUser) {
+            fetch(`${BACKEND_URL}/update-stats`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser.username, messageCount: 1 })
+            }).catch(e => console.log('Статистика не обновлена'));
         }
-        const data = await response.json();
-        stats.totalTokens += data.usage?.total_tokens || 0;
-        saveStats();
-        return data.choices[0].message.content;
     }
 
-    async function sendToAI(message) {
+ async function callGroq(messages) {
+    const userId = currentUser ? currentUser.username : getUserId();
+    
+    const response = await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer m5sticker-super-secret-2024-xk9j2m7',
+            'X-Request-Timestamp': Date.now().toString(),
+            'X-User-Id': userId
+        },
+        body: JSON.stringify({ 
+            model: currentModel, 
+            messages: messages, 
+            temperature: 0.7, 
+            max_tokens: 1000,
+            userId: userId
+        })
+    });
+    
+    if (response.status === 429) {
+        throw new Error('Лимит запросов. Попробуйте через минуту.');
+    }
+    if (response.status === 401) {
+        throw new Error('Неверный токен доступа.');
+    }
+    if (response.status === 403) {
+        throw new Error('Доступ запрещён.');
+    }
+    if(!response.ok) throw new Error('Groq error');
+    
+    const data = await response.json();
+    stats.totalTokens += data.usage?.total_tokens || 0;
+    saveStats();
+    return data.choices[0].message.content;
+}    async function sendToAI(message) {
         const apiMessages = [
             { role: 'system', content: MODE_PROMPTS[currentMode] },
             ...conversationHistory.slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content })),
             { role: 'user', content: message }
         ];
-        
-        if (currentModel.startsWith('claude')) {
-            return await callClaude(apiMessages);
-        } else {
-            return await callGroq(apiMessages);
-        }
+        return await callGroq(apiMessages);
     }
 
-    // ========== ОСНОВНЫЕ ФУНКЦИИ ==========
     function escapeHtml(str) {
         if(!str) return '';
         return str.replace(/[&<>]/g, function(m) {
@@ -605,7 +846,6 @@
         });
     }
 
-    // Вкладки
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -621,55 +861,65 @@
     });
 
     const savedNotifications = localStorage.getItem('notifications_enabled');
-    if (savedNotifications === 'true') {
+    if (savedNotifications === 'true' && notificationStatus) {
         notificationsEnabled = true;
         notificationStatus.innerHTML = '🟢 Вкл';
         notificationStatus.style.color = '#10b981';
-        notificationToggle.style.background = 'rgba(16, 185, 129, 0.2)';
+        if(notificationToggle) notificationToggle.style.background = 'rgba(16, 185, 129, 0.2)';
     }
 
-    sendBtn.addEventListener('click', () => sendMessage());
-    clearChatBtn.addEventListener('click', clearChat);
-    resetStatsBtn.addEventListener('click', resetStats);
-    testNotificationBtn.addEventListener('click', () => {
-        if (notificationsEnabled && Notification.permission === 'granted') {
-            sendNotification('🔔 Тестовое уведомление', 'Уведомления работают!');
-        } else {
-            alert('Сначала включите уведомления переключателем выше!');
-        }
-    });
-    notificationToggle.addEventListener('click', toggleNotifications);
+    if(sendBtn) sendBtn.addEventListener('click', () => sendMessage());
+    if(clearChatBtn) clearChatBtn.addEventListener('click', clearChat);
+    if(resetStatsBtn) resetStatsBtn.addEventListener('click', resetStats);
+    if(testNotificationBtn) {
+        testNotificationBtn.addEventListener('click', () => {
+            if (notificationsEnabled && Notification.permission === 'granted') {
+                sendNotification('🔔 Тестовое уведомление', 'Уведомления работают!');
+            } else {
+                alert('Сначала включите уведомления переключателем выше!');
+            }
+        });
+    }
+    if(notificationToggle) notificationToggle.addEventListener('click', toggleNotifications);
     
-    userInput.addEventListener('keydown', (e) => { 
-        if(e.key === 'Enter' && !e.shiftKey && !isGenerating) { 
-            e.preventDefault(); 
-            sendMessage(); 
-        } 
-    });
-    userInput.addEventListener('input', autoResize);
-    modelSelect.addEventListener('change', (e) => { 
-        currentModel = e.target.value; 
-        modelBadge.innerText = modelSelect.options[modelSelect.selectedIndex].text; 
-    });
-    modeSelect.addEventListener('change', (e) => { currentMode = e.target.value; });
+    if(userInput) {
+        userInput.addEventListener('keydown', (e) => { 
+            if(e.key === 'Enter' && !e.shiftKey && !isGenerating) { 
+                e.preventDefault(); 
+                sendMessage(); 
+            } 
+        });
+        userInput.addEventListener('input', autoResize);
+    }
+    if(modelSelect) {
+        modelSelect.addEventListener('change', (e) => { 
+            currentModel = e.target.value; 
+            if(modelBadge) modelBadge.innerText = modelSelect.options[modelSelect.selectedIndex].text; 
+        });
+    }
+    if(modeSelect) modeSelect.addEventListener('change', (e) => { currentMode = e.target.value; });
 
     renderTemplates();
-    loadStats();
-    loadChatsLocal();
-    updateUniqueUsers();
+    if(!savedUser) {
+        loadStats();
+        loadChatsLocal();
+        updateUniqueUsers();
+    }
     autoResize();
     
-    // Проверка прокси
-    fetch(OPENROUTER_PROXY_URL, { method: 'GET' })
-        .then(r => r.json())
-        .then(data => {
+    // Проверка соединения с бэкендом
+    async function checkBackend() {
+        try {
+            const response = await fetch(`${BACKEND_URL}/ping`);
+            const data = await response.json();
             if (data.status === 'ok') {
-                console.log('✅ OpenRouter proxy работает');
+                console.log('✅ Бэкенд с D1 работает!');
             }
-        })
-        .catch(() => {
-            addMessage('assistant', '⚠️ OpenRouter прокси не отвечает. Проверьте URL в настройках.', true);
-        });
+        } catch (error) {
+            console.log('⚠️ Бэкенд не отвечает, проверьте URL');
+        }
+    }
+    checkBackend();
 </script>
 </body>
 </html>
