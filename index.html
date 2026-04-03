@@ -291,10 +291,20 @@
 
 <script>
     // ========== БЭКЕНД ==========
-    // ⚠️ ЗАМЕНИТЕ НА ВАШ URL WORKER С D1!
     const BACKEND_URL = 'https://round-firefly-edb2.inkodinoklapotkin.workers.dev';
+    const BACKEND_TOKEN = 'm5sticker-d1-secret-2024'; // Секретный токен для бэкенда!
     
     let currentUser = null;
+    
+    // Функция для получения ID пользователя (IP или localStorage)
+    function getClientId() {
+        let id = localStorage.getItem('client_id');
+        if (!id) {
+            id = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('client_id', id);
+        }
+        return id;
+    }
     
     async function handleRegister() {
         const username = document.getElementById('regUsername').value.trim();
@@ -312,8 +322,17 @@
         try {
             const response = await fetch(`${BACKEND_URL}/register`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, email, password })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${BACKEND_TOKEN}`,
+                    'X-User-Id': getClientId()
+                },
+                body: JSON.stringify({ 
+                    username, 
+                    email, 
+                    password, 
+                    userId: getClientId() 
+                })
             });
             
             const data = await response.json();
@@ -344,8 +363,16 @@
         try {
             const response = await fetch(`${BACKEND_URL}/login`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${BACKEND_TOKEN}`,
+                    'X-User-Id': getClientId()
+                },
+                body: JSON.stringify({ 
+                    username, 
+                    password, 
+                    userId: getClientId() 
+                })
             });
             
             const data = await response.json();
@@ -672,52 +699,57 @@
         updateStatsUI();
         saveStats();
         
-        // Обновляем статистику в бэкенде
         if (currentUser) {
             fetch(`${BACKEND_URL}/update-stats`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: currentUser.username, messageCount: 1 })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${BACKEND_TOKEN}`,
+                    'X-User-Id': getClientId()
+                },
+                body: JSON.stringify({ username: currentUser.username, messageCount: 1, userId: getClientId() })
             }).catch(e => console.log('Статистика не обновлена'));
         }
     }
 
- async function callGroq(messages) {
-    const userId = currentUser ? currentUser.username : getUserId();
-    
-    const response = await fetch(PROXY_URL, {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer m5sticker-super-secret-2024-xk9j2m7',
-            'X-Request-Timestamp': Date.now().toString(),
-            'X-User-Id': userId
-        },
-        body: JSON.stringify({ 
-            model: currentModel, 
-            messages: messages, 
-            temperature: 0.7, 
-            max_tokens: 1000,
-            userId: userId
-        })
-    });
-    
-    if (response.status === 429) {
-        throw new Error('Лимит запросов. Попробуйте через минуту.');
+    async function callGroq(messages) {
+        const userId = currentUser ? currentUser.username : getUserId();
+        
+        const response = await fetch(PROXY_URL, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer m5sticker-super-secret-2024-xk9j2m7',
+                'X-Request-Timestamp': Date.now().toString(),
+                'X-User-Id': userId
+            },
+            body: JSON.stringify({ 
+                model: currentModel, 
+                messages: messages, 
+                temperature: 0.7, 
+                max_tokens: 1000,
+                userId: userId
+            })
+        });
+        
+        if (response.status === 429) {
+            throw new Error('Лимит запросов. Попробуйте через минуту.');
+        }
+        if (response.status === 401) {
+            throw new Error('Неверный токен доступа.');
+        }
+        if (response.status === 403) {
+            throw new Error('Доступ запрещён.');
+        }
+        if(!response.ok) throw new Error('Groq error');
+        
+        const data = await response.json();
+        stats.totalTokens += data.usage?.total_tokens || 0;
+        saveStats();
+        return data.choices[0].message.content;
     }
-    if (response.status === 401) {
-        throw new Error('Неверный токен доступа.');
-    }
-    if (response.status === 403) {
-        throw new Error('Доступ запрещён.');
-    }
-    if(!response.ok) throw new Error('Groq error');
     
-    const data = await response.json();
-    stats.totalTokens += data.usage?.total_tokens || 0;
-    saveStats();
-    return data.choices[0].message.content;
-}    async function sendToAI(message) {
+    async function sendToAI(message) {
         const apiMessages = [
             { role: 'system', content: MODE_PROMPTS[currentMode] },
             ...conversationHistory.slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content })),
