@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0a0a0a">
     <title>AI by M5sticker</title>
+    <!-- Cloudflare Turnstile -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', sans-serif; background: #050505; min-height: 100vh; color: #fff; }
@@ -148,23 +150,6 @@
             font-size: 0.8rem;
             margin-top: 10px;
         }
-        .captcha-row {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .captcha-row input { flex: 1; margin: 0; }
-        .captcha-preview {
-            background: linear-gradient(135deg, #1e293b, #0f172a);
-            padding: 12px;
-            border-radius: 32px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            letter-spacing: 4px;
-            font-family: monospace;
-            min-width: 100px;
-            text-align: center;
-        }
     </style>
 </head>
 <body>
@@ -186,20 +171,12 @@
             <input type="text" id="regUsername" placeholder="Имя пользователя (буквы, цифры, _)">
             <input type="email" id="regEmail" placeholder="Email">
             <input type="password" id="regPassword" placeholder="Пароль (мин. 4 символа)">
-            <div class="captcha-row">
-                <input type="text" id="captchaInput" placeholder="2 + 2 = ?">
-                <div class="captcha-preview">2 + 2 = ?</div>
-            </div>
+            
+            <!-- Cloudflare Turnstile CAPTCHA -->
+            <div class="cf-turnstile" data-sitekey="0x4AAAAAAC0gRJ-M0nsTGI6d" data-theme="dark" data-size="normal" style="margin: 12px 0;"></div>
+            
             <button class="modal-btn" onclick="handleRegister()">📝 Зарегистрироваться</button>
             <div class="modal-switch" onclick="switchToLogin()">Уже есть аккаунт? <span>Войти</span></div>
-        </div>
-        
-        <div id="verificationPanel" style="display: none;">
-            <p style="color: #a5b4fc; margin-bottom: 15px;">📧 Код отправлен на ваш email</p>
-            <input type="email" id="verifyEmail" placeholder="Email" readonly style="background: rgba(20,20,30,0.5);">
-            <input type="text" id="verifyCode" placeholder="Введите код из письма">
-            <button class="modal-btn" onclick="verifyEmail()">✅ Подтвердить</button>
-            <div class="modal-switch" onclick="cancelVerification()">← Вернуться к регистрации</div>
         </div>
         
         <div id="authMessage" class="loading-text"></div>
@@ -353,97 +330,88 @@
         return id;
     }
 
-    // ========== РЕГИСТРАЦИЯ ==========
+    // ========== РЕГИСТРАЦИЯ С TURNSTILE ==========
     async function handleRegister() {
         const username = document.getElementById('regUsername').value.trim();
         const email = document.getElementById('regEmail').value.trim();
         const password = document.getElementById('regPassword').value;
-        const captcha = document.getElementById('captchaInput').value.trim();
         const msgDiv = document.getElementById('authMessage');
+        
+        // Получаем токен Turnstile
+        const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value;
+        
+        if (!turnstileToken) {
+            msgDiv.innerText = '❌ Подтвердите, что вы не робот!';
+            return;
+        }
         
         if (!username || !email || !password) {
             msgDiv.innerText = '❌ Заполните все поля!';
             return;
         }
-        if (captcha !== '4') {
-            msgDiv.innerText = '❌ Неправильный ответ на капчу! 2 + 2 = 4';
-            return;
-        }
+        
         msgDiv.innerText = '⏳ Регистрация...';
         
         try {
             const response = await fetch(`${BACKEND_URL}/register`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BACKEND_TOKEN}`, 'X-User-Id': getClientId() },
-                body: JSON.stringify({ username, email, password, userId: getClientId() })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${BACKEND_TOKEN}`,
+                    'X-User-Id': getClientId()
+                },
+                body: JSON.stringify({ 
+                    username, 
+                    email, 
+                    password, 
+                    turnstileToken,
+                    userId: getClientId() 
+                })
             });
+            
             const data = await response.json();
-            if (response.ok && data.requiresVerification) {
-                msgDiv.innerHTML = '✅ Код отправлен на почту!<br>Введите его ниже:';
-                document.getElementById('registerForm').style.display = 'none';
-                document.getElementById('verificationPanel').style.display = 'block';
-                document.getElementById('verifyEmail').value = email;
-            } else if (response.ok) {
+            
+            if (response.ok) {
                 msgDiv.innerText = '✅ Регистрация успешна! Теперь войдите.';
                 setTimeout(() => switchToLogin(), 1500);
             } else {
                 msgDiv.innerText = `❌ ${data.error}`;
+                // Сброс Turnstile
+                if (typeof turnstile !== 'undefined') {
+                    turnstile.reset();
+                }
             }
         } catch (error) {
             msgDiv.innerText = `❌ Ошибка: ${error.message}`;
         }
     }
-
-    async function verifyEmail() {
-        const email = document.getElementById('verifyEmail').value;
-        const code = document.getElementById('verifyCode').value.trim();
-        const msgDiv = document.getElementById('authMessage');
-        if (!email || !code) {
-            msgDiv.innerText = '❌ Введите email и код!';
-            return;
-        }
-        msgDiv.innerText = '⏳ Проверка кода...';
-        try {
-            const response = await fetch(`${BACKEND_URL}/verify`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BACKEND_TOKEN}`, 'X-User-Id': getClientId() },
-                body: JSON.stringify({ email, code })
-            });
-            const data = await response.json();
-            if (response.ok) {
-                msgDiv.innerText = '✅ Email подтверждён! Теперь войдите.';
-                setTimeout(() => switchToLogin(), 1500);
-            } else {
-                msgDiv.innerText = `❌ ${data.error}`;
-            }
-        } catch (error) {
-            msgDiv.innerText = `❌ Ошибка: ${error.message}`;
-        }
-    }
-
-    function cancelVerification() {
-        document.getElementById('verificationPanel').style.display = 'none';
-        document.getElementById('registerForm').style.display = 'block';
-        document.getElementById('authMessage').innerText = '';
-        document.getElementById('verifyCode').value = '';
-    }
-
+    
+    // ========== ВХОД ==========
     async function handleLogin() {
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value;
         const msgDiv = document.getElementById('authMessage');
+        
         if (!username || !password) {
             msgDiv.innerText = '❌ Введите имя пользователя и пароль!';
             return;
         }
+        
         msgDiv.innerText = '⏳ Вход...';
+        
         try {
             const response = await fetch(`${BACKEND_URL}/login`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BACKEND_TOKEN}`, 'X-User-Id': getClientId() },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${BACKEND_TOKEN}`,
+                    'X-User-Id': getClientId()
+                },
                 body: JSON.stringify({ username, password, userId: getClientId() })
             });
+            
             const data = await response.json();
+            
             if (response.ok) {
                 currentUser = data.user;
                 localStorage.setItem('current_user', JSON.stringify(currentUser));
@@ -461,27 +429,22 @@
             msgDiv.innerText = `❌ Ошибка: ${error.message}`;
         }
     }
-
+    
     function switchToRegister() {
         document.getElementById('loginForm').style.display = 'none';
         document.getElementById('registerForm').style.display = 'block';
-        document.getElementById('verificationPanel').style.display = 'none';
         document.getElementById('authMessage').innerText = '';
-        document.getElementById('captchaInput').value = '';
     }
-
+    
     function switchToLogin() {
         document.getElementById('registerForm').style.display = 'none';
-        document.getElementById('verificationPanel').style.display = 'none';
         document.getElementById('loginForm').style.display = 'block';
         document.getElementById('authMessage').innerText = '';
         document.getElementById('regUsername').value = '';
         document.getElementById('regEmail').value = '';
         document.getElementById('regPassword').value = '';
-        document.getElementById('captchaInput').value = '';
-        document.getElementById('verifyCode').value = '';
     }
-
+    
     function logout() {
         currentUser = null;
         localStorage.removeItem('current_user');
@@ -491,7 +454,7 @@
         document.getElementById('loginPassword').value = '';
         switchToLogin();
     }
-
+    
     const savedUser = localStorage.getItem('current_user');
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
