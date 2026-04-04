@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0a0a0a">
-    <title>AI by M5sticker — Защищённая версия</title>
+    <title>AI by M5sticker</title>
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -41,8 +41,7 @@
         @keyframes fadeSlide { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .thinking { background: rgba(30, 30, 45, 0.9); padding: 10px 18px; border-radius: 24px; display: inline-flex; align-items: center; gap: 8px; }
         .section-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #a5b4fc; margin: 16px 0 10px 0; }
-        .clear-btn, .reset-stats-btn, .admin-delete-btn { background: rgba(99, 102, 241, 0.2); border: 0.5px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 8px 16px; border-radius: 32px; cursor: pointer; width: 100%; margin-top: 10px; font-size: 0.7rem; }
-        .admin-delete-btn { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+        .clear-btn, .reset-stats-btn { background: rgba(99, 102, 241, 0.2); border: 0.5px solid rgba(99, 102, 241, 0.4); color: #a5b4fc; padding: 8px 16px; border-radius: 32px; cursor: pointer; width: 100%; margin-top: 10px; font-size: 0.7rem; }
         .stats-premium { background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.1)); border-radius: 28px; padding: 16px; margin: 20px 0; border: 0.5px solid rgba(99, 102, 241, 0.3); }
         .stats-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 0.8rem; }
         .stats-number { font-size: 1.6rem; font-weight: 700; color: #a5b4fc; }
@@ -54,11 +53,37 @@
         .templates-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 16px; }
         .template-card { background: rgba(25,25,38,0.7); border-radius: 24px; padding: 10px; cursor: pointer; text-align: center; font-size: 0.7rem; transition: 0.2s; }
         .template-card:hover { background: #6366f1; transform: translateY(-2px); }
-        .admin-user-list { max-height: 300px; overflow-y: auto; margin-top: 10px; }
-        .admin-user-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 0.5px solid rgba(255,255,255,0.1); font-size: 0.75rem; }
+        .admin-user-list { max-height: 250px; overflow-y: auto; margin-top: 10px; }
+        .admin-user-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 0.5px solid rgba(255,255,255,0.1); font-size: 0.75rem; cursor: pointer; }
         .admin-user-item:hover { background: rgba(99, 102, 241, 0.2); }
         .admin-user-delete { background: none; border: none; color: #f87171; cursor: pointer; font-size: 0.7rem; padding: 4px 8px; border-radius: 20px; }
         .admin-user-delete:hover { background: rgba(239, 68, 68, 0.3); }
+        .chat-history-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 200000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .chat-history-container {
+            background: rgba(30, 30, 45, 0.95);
+            border-radius: 32px;
+            padding: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .chat-history-message { padding: 10px; margin: 8px 0; border-radius: 16px; background: rgba(20, 20, 30, 0.8); }
+        .chat-history-user { color: #a5b4fc; font-weight: bold; }
+        .chat-history-assistant { color: #10b981; }
+        .close-modal { background: #ef4444; border: none; color: white; padding: 8px 16px; border-radius: 30px; cursor: pointer; margin-top: 10px; }
+        canvas { background: rgba(30, 30, 45, 0.5); border-radius: 16px; padding: 10px; width: 100%; height: auto; }
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -193,6 +218,12 @@
 
             <div id="adminTab" class="tab-content">
                 <div class="section-title">👑 АДМИН-ПАНЕЛЬ</div>
+                
+                <div class="admin-card">
+                    <div class="section-title" style="margin-top: 0;">📈 АКТИВНОСТЬ ПО ДНЯМ</div>
+                    <canvas id="activityChart" width="400" height="150" style="width:100%; height:auto; background: rgba(30,30,45,0.5); border-radius: 16px;"></canvas>
+                </div>
+                
                 <div class="admin-card">
                     <div class="section-title" style="margin-top: 0;">📊 ОБЩАЯ СТАТИСТИКА</div>
                     <div class="stats-row"><span>👥 Всего пользователей:</span><span id="adminTotalUsers">0</span></div>
@@ -200,7 +231,11 @@
                     <div class="stats-row"><span>💬 Всего сообщений:</span><span id="adminTotalMessages">0</span></div>
                     <div class="stats-row"><span>📅 Новых за сегодня:</span><span id="adminNewToday">0</span></div>
                 </div>
-                <div class="section-title">👥 ПОЛЬЗОВАТЕЛИ</div>
+                
+                <div class="section-title">🔍 ПОИСК ПОЛЬЗОВАТЕЛЕЙ</div>
+                <input type="text" id="adminSearch" placeholder="🔍 Поиск по имени или email..." style="width:100%; padding: 10px; border-radius: 32px; background: rgba(30,30,45,0.8); border: 0.5px solid rgba(255,255,255,0.1); color: white; margin-bottom: 10px;">
+                
+                <div class="section-title">👥 ПОЛЬЗОВАТЕЛИ (нажмите для истории чатов)</div>
                 <div id="adminUserList" class="admin-user-list">
                     <div style="opacity: 0.6; text-align: center;">Загрузка...</div>
                 </div>
@@ -236,14 +271,23 @@
     </div>
 </div>
 
+<!-- Модальное окно для истории чатов -->
+<div id="chatHistoryModal" class="chat-history-modal">
+    <div class="chat-history-container">
+        <h3 style="margin-bottom: 15px;">📜 История чатов пользователя <span id="historyUsername"></span></h3>
+        <div id="chatHistoryContent" style="max-height: 500px; overflow-y: auto;"></div>
+        <button class="close-modal" onclick="closeChatHistory()">Закрыть</button>
+    </div>
+</div>
+
 <script>
     // ========== КОНФИГУРАЦИЯ ==========
     const BACKEND_URL = 'https://round-firefly-edb2.inkodinoklapotkin.workers.dev';
     const BACKEND_TOKEN = 'm5sticker-d1-secret-2024';
     const PROXY_URL = 'https://groq-proxybyinkodinok.inkodinoklapotkin.workers.dev';
     
-    // АДМИНИСТРАТОР (только этот пользователь видит админ-панель)
     const ADMIN_USERNAME = 'm5sticker';
+    const ADMIN_SECRET_KEY = 'my-super-secret-admin-key-2024';
     
     let currentUser = null;
     let currentModel = 'llama-3.3-70b-versatile';
@@ -258,7 +302,6 @@
     };
     let conversationHistory = [];
 
-    // DOM элементы
     const messagesContainer = document.getElementById('messagesContainer');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -300,16 +343,9 @@
         return id;
     }
 
-    // ========== СОХРАНЕНИЕ ЧАТОВ ==========
     function saveChatsToLocal() {
         if (!currentUser) return;
-        const chats = {
-            userId: currentUser.id,
-            username: currentUser.username,
-            history: conversationHistory,
-            timestamp: Date.now()
-        };
-        localStorage.setItem(`chat_${currentUser.id}`, JSON.stringify(chats));
+        localStorage.setItem(`chat_${currentUser.id}`, JSON.stringify(conversationHistory));
     }
 
     function loadChatsFromLocal() {
@@ -318,8 +354,8 @@
         if (saved) {
             try {
                 const data = JSON.parse(saved);
-                if (data.history && data.history.length > 0) {
-                    conversationHistory = data.history;
+                if (data && data.length > 0) {
+                    conversationHistory = data;
                     for(let msg of conversationHistory) {
                         const msgDiv = document.createElement('div');
                         msgDiv.className = `message ${msg.role}`;
@@ -406,7 +442,6 @@
                 document.getElementById('userNameDisplay').innerText = currentUser.username;
                 document.getElementById('userBadge').innerHTML = `👤 ${currentUser.username}`;
                 
-                // Показать админ-панель только для администратора
                 if (currentUser.username === ADMIN_USERNAME) {
                     adminTabBtn.style.display = 'block';
                     loadAdminPanel();
@@ -470,13 +505,17 @@
         updateUniqueUsers();
     }
 
-    // ========== АДМИН-ПАНЕЛЬ (ТОЛЬКО ДЛЯ m5sticker) ==========
+    // ========== АДМИН-ПАНЕЛЬ ==========
     async function loadAdminPanel() {
         if (currentUser?.username !== ADMIN_USERNAME) return;
         
         try {
             const response = await fetch(`${BACKEND_URL}/admin/users`, {
-                headers: { 'Authorization': `Bearer ${BACKEND_TOKEN}`, 'X-Admin-Key': ADMIN_USERNAME }
+                headers: { 
+                    'Authorization': `Bearer ${BACKEND_TOKEN}`,
+                    'X-Admin-Key': ADMIN_USERNAME,
+                    'X-Admin-Secret': ADMIN_SECRET_KEY
+                }
             });
             const data = await response.json();
             
@@ -500,17 +539,76 @@
                             <strong>${escapeHtml(user.username)}</strong><br>
                             <span style="font-size: 0.6rem; opacity: 0.6;">${user.email || 'нет email'}</span>
                             <span style="font-size: 0.6rem; opacity: 0.6;"> | Сообщений: ${user.message_count || 0}</span>
-                            <span style="font-size: 0.6rem; opacity: 0.6;"> | Регистрация: ${user.created_at?.substring(0,10) || '?'}</span>
                         </div>
                         ${user.username !== ADMIN_USERNAME ? `<button class="admin-user-delete" onclick="deleteUser('${user.username}')">🗑️</button>` : '<span style="font-size:0.6rem; opacity:0.5;">👑</span>'}
                     `;
+                    div.onclick = (e) => {
+                        if (e.target.tagName !== 'BUTTON') {
+                            showUserChatHistory(user.username);
+                        }
+                    };
                     userList.appendChild(div);
                 });
+                
+                drawActivityChart(data.users);
             }
         } catch(e) {
             console.error('Admin panel error:', e);
         }
     }
+    
+    function drawActivityChart(users) {
+        const canvas = document.getElementById('activityChart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const last7Days = [];
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            last7Days.push(date.toDateString());
+        }
+        const counts = last7Days.map(day => {
+            return users.filter(u => new Date(u.created_at).toDateString() === day).length;
+        });
+        const maxCount = Math.max(...counts, 1);
+        canvas.width = 400;
+        canvas.height = 150;
+        ctx.fillStyle = '#6366f1';
+        for (let i = 0; i < counts.length; i++) {
+            const barHeight = (counts[i] / maxCount) * 120;
+            ctx.fillRect(i * 50 + 10, 140 - barHeight, 35, barHeight);
+        }
+        ctx.fillStyle = '#a5b4fc';
+        ctx.font = '10px sans-serif';
+        for (let i = 0; i < last7Days.length; i++) {
+            ctx.fillText(last7Days[i].slice(0, 3), i * 50 + 15, 145);
+        }
+    }
+    
+    function showUserChatHistory(username) {
+        const history = JSON.parse(localStorage.getItem(`chat_${username}`) || '[]');
+        const modal = document.getElementById('chatHistoryModal');
+        const content = document.getElementById('chatHistoryContent');
+        document.getElementById('historyUsername').innerText = username;
+        
+        if (history.length === 0) {
+            content.innerHTML = '<div style="text-align:center; opacity:0.6;">Нет истории чатов</div>';
+        } else {
+            content.innerHTML = history.map(msg => `
+                <div class="chat-history-message">
+                    <div class="${msg.role === 'user' ? 'chat-history-user' : 'chat-history-assistant'}">
+                        <strong>${msg.role === 'user' ? '👤 Пользователь' : '🤖 AI'}:</strong>
+                    </div>
+                    <div style="margin-top: 5px;">${escapeHtml(msg.content).substring(0, 300)}${msg.content.length > 300 ? '...' : ''}</div>
+                </div>
+            `).join('');
+        }
+        modal.style.display = 'flex';
+    }
+    
+    window.closeChatHistory = function() {
+        document.getElementById('chatHistoryModal').style.display = 'none';
+    };
     
     window.deleteUser = async function(username) {
         if (username === ADMIN_USERNAME) {
@@ -521,7 +619,12 @@
             try {
                 const response = await fetch(`${BACKEND_URL}/admin/delete-user`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BACKEND_TOKEN}`, 'X-Admin-Key': ADMIN_USERNAME },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${BACKEND_TOKEN}`,
+                        'X-Admin-Key': ADMIN_USERNAME,
+                        'X-Admin-Secret': ADMIN_SECRET_KEY
+                    },
                     body: JSON.stringify({ username })
                 });
                 if (response.ok) {
@@ -537,6 +640,14 @@
     };
     
     document.getElementById('adminRefreshBtn')?.addEventListener('click', loadAdminPanel);
+    
+    document.getElementById('adminSearch')?.addEventListener('input', (e) => {
+        const search = e.target.value.toLowerCase();
+        document.querySelectorAll('.admin-user-item').forEach(item => {
+            const name = item.querySelector('strong')?.innerText.toLowerCase() || '';
+            item.style.display = name.includes(search) ? 'flex' : 'none';
+        });
+    });
 
     // ========== СТАТИСТИКА ==========
     function updateUniqueUsers() {
