@@ -54,7 +54,6 @@
         .template-card { background: rgba(25,25,38,0.7); border-radius: 24px; padding: 10px; cursor: pointer; text-align: center; font-size: 0.7rem; transition: 0.2s; }
         .template-card:hover { background: #6366f1; transform: translateY(-2px); }
         
-        /* Модальное окно */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -149,6 +148,23 @@
             font-size: 0.8rem;
             margin-top: 10px;
         }
+        .captcha-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .captcha-row input { flex: 1; margin: 0; }
+        .captcha-preview {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            padding: 12px;
+            border-radius: 32px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 4px;
+            font-family: monospace;
+            min-width: 100px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -167,12 +183,25 @@
         </div>
         
         <div id="registerForm" style="display: none;">
-            <input type="text" id="regUsername" placeholder="Имя пользователя">
+            <input type="text" id="regUsername" placeholder="Имя пользователя (буквы, цифры, _)">
             <input type="email" id="regEmail" placeholder="Email">
-            <input type="password" id="regPassword" placeholder="Пароль">
+            <input type="password" id="regPassword" placeholder="Пароль (мин. 4 символа)">
+            <div class="captcha-row">
+                <input type="text" id="captchaInput" placeholder="2 + 2 = ?">
+                <div class="captcha-preview">2 + 2 = ?</div>
+            </div>
             <button class="modal-btn" onclick="handleRegister()">📝 Зарегистрироваться</button>
             <div class="modal-switch" onclick="switchToLogin()">Уже есть аккаунт? <span>Войти</span></div>
         </div>
+        
+        <div id="verificationPanel" style="display: none;">
+            <p style="color: #a5b4fc; margin-bottom: 15px;">📧 Код отправлен на ваш email</p>
+            <input type="email" id="verifyEmail" placeholder="Email" readonly style="background: rgba(20,20,30,0.5);">
+            <input type="text" id="verifyCode" placeholder="Введите код из письма">
+            <button class="modal-btn" onclick="verifyEmail()">✅ Подтвердить</button>
+            <div class="modal-switch" onclick="cancelVerification()">← Вернуться к регистрации</div>
+        </div>
+        
         <div id="authMessage" class="loading-text"></div>
     </div>
 </div>
@@ -183,14 +212,12 @@
             <div style="text-align: center; margin-bottom: 16px;">
                 <div class="logo" style="margin: 0 auto 12px auto;">✨</div>
                 <h3 style="font-weight: 600;">AI Ultra</h3>
-                <div class="badge" style="display: inline-block; margin-top: 6px;" id="userBadge"></div>
+                <div class="badge" id="userBadge" style="display: inline-block; margin-top: 6px;"></div>
             </div>
-
             <div class="tabs">
                 <button class="tab-btn active" data-tab="chat">💬 Чат</button>
                 <button class="tab-btn" data-tab="stats">📊 Статистика</button>
             </div>
-
             <div id="chatTab" class="tab-content active">
                 <div class="section-title">🤖 МОДЕЛИ</div>
                 <select id="modelSelect" class="model-select">
@@ -203,7 +230,6 @@
                         <option value="groq/compound-mini">🔬 Groq Mini</option>
                     </optgroup>
                 </select>
-
                 <div class="section-title">🎭 РЕЖИМ</div>
                 <select id="modeSelect" class="mode-select">
                     <option value="general">💬 Обычный</option>
@@ -211,13 +237,10 @@
                     <option value="teacher">📚 Учитель</option>
                     <option value="creative">🎨 Креатор</option>
                 </select>
-
                 <div class="section-title">📋 ШАБЛОНЫ ПРОМПТОВ</div>
                 <div class="templates-grid" id="templatesGrid"></div>
-
                 <button id="clearChatBtn" class="clear-btn">🗑️ ОЧИСТИТЬ ЧАТ</button>
             </div>
-
             <div id="statsTab" class="tab-content">
                 <div class="section-title">🔔 УВЕДОМЛЕНИЯ</div>
                 <div class="notification-toggle" id="notificationToggle">
@@ -225,7 +248,6 @@
                     <span id="notificationStatus">🔴 Выкл</span>
                 </div>
                 <button id="testNotificationBtn" class="clear-btn" style="margin-top: 0;">📢 Тестовое уведомление</button>
-
                 <div class="section-title" style="margin-top: 20px;">📊 СТАТИСТИКА</div>
                 <div class="stats-premium">
                     <div class="stats-row"><span>💬 Всего сообщений:</span><span class="stats-number" id="totalMsgStat">0</span></div>
@@ -234,55 +256,37 @@
                     <div class="stats-row"><span>🔥 Популярная модель:</span><span id="topModelStat" style="color:#a5b4fc;">—</span></div>
                     <div class="stats-row"><span>⏱️ Среднее время ответа:</span><span id="avgTimeStat" style="color:#a5b4fc;">0 сек</span></div>
                 </div>
-
                 <div class="admin-card">
                     <div class="section-title" style="margin-top: 0;">📈 ТОП ЗАПРОСОВ</div>
-                    <div id="topQueriesList" style="font-size: 0.75rem; max-height: 150px; overflow-y: auto;">
-                        <div style="opacity: 0.6;">Нет данных</div>
-                    </div>
+                    <div id="topQueriesList" style="font-size: 0.75rem; max-height: 150px; overflow-y: auto;"><div style="opacity: 0.6;">Нет данных</div></div>
                 </div>
-
                 <div class="admin-card">
                     <div class="section-title" style="margin-top: 0;">🕐 АКТИВНОСТЬ ПО ЧАСАМ</div>
-                    <div id="hourlyActivity" style="font-size: 0.7rem; display: flex; flex-wrap: wrap; gap: 8px;">
-                        <div style="opacity: 0.6;">Нет данных</div>
-                    </div>
+                    <div id="hourlyActivity" style="font-size: 0.7rem; display: flex; flex-wrap: wrap; gap: 8px;"><div style="opacity: 0.6;">Нет данных</div></div>
                 </div>
-
                 <button id="resetStatsBtn" class="reset-stats-btn" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #f87171;">🔄 СБРОСИТЬ СТАТИСТИКУ</button>
             </div>
-
             <div class="tg-card">
                 <div>📢 ПОДПИШИСЬ НА АВТОРА</div>
                 <div style="font-size: 0.8rem; opacity: 0.7; margin: 8px 0;">Крутой канал про пентест</div>
                 <a href="https://t.me/m5sticker2" target="_blank" class="tg-button">📱 Telegram канал @m5sticker2</a>
             </div>
-            
             <div class="user-info">
                 <div class="user-avatar">👤</div>
                 <span id="userNameDisplay">Пользователь</span>
                 <button class="logout-btn" onclick="logout()">🚪 Выйти</button>
             </div>
         </div>
-
         <div class="chat-main">
             <div class="chat-header">
-                <div class="logo-area">
-                    <div class="logo">🤖</div>
-                    <div class="title">AI by M5sticker</div>
-                </div>
+                <div class="logo-area"><div class="logo">🤖</div><div class="title">AI by M5sticker</div></div>
                 <div class="badge" id="modelBadge">Llama 3.3 70B</div>
             </div>
             <div class="messages-area" id="messagesContainer">
-                <div class="message assistant">
-                    <div class="avatar">✨</div>
-                    <div class="bubble">Привет! <strong>✨ ты лучший! ✨</strong> Выбирай модель и задавай вопросы!</div>
-                </div>
+                <div class="message assistant"><div class="avatar">✨</div><div class="bubble">Привет! <strong>✨ ты лучший! ✨</strong> Выбирай модель и задавай вопросы!</div></div>
             </div>
             <div class="input-panel">
-                <div class="input-wrapper">
-                    <textarea id="userInput" placeholder="Напиши сообщение..." rows="1"></textarea>
-                </div>
+                <div class="input-wrapper"><textarea id="userInput" placeholder="Напиши сообщение..." rows="1"></textarea></div>
                 <button id="sendBtn">➤</button>
             </div>
         </div>
@@ -290,152 +294,12 @@
 </div>
 
 <script>
-    // ========== БЭКЕНД ==========
-    const BACKEND_URL = 'https://round-firefly-edb2.inkodinoklapotkin.workers.dev';
-    const BACKEND_TOKEN = 'm5sticker-d1-secret-2024'; // Секретный токен для бэкенда!
-    
-    let currentUser = null;
-    
-    // Функция для получения ID пользователя (IP или localStorage)
-    function getClientId() {
-        let id = localStorage.getItem('client_id');
-        if (!id) {
-            id = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('client_id', id);
-        }
-        return id;
-    }
-    
-    async function handleRegister() {
-        const username = document.getElementById('regUsername').value.trim();
-        const email = document.getElementById('regEmail').value.trim();
-        const password = document.getElementById('regPassword').value;
-        const msgDiv = document.getElementById('authMessage');
-        
-        if (!username || !email || !password) {
-            msgDiv.innerText = '❌ Заполните все поля!';
-            return;
-        }
-        
-        msgDiv.innerText = '⏳ Регистрация...';
-        
-        try {
-            const response = await fetch(`${BACKEND_URL}/register`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${BACKEND_TOKEN}`,
-                    'X-User-Id': getClientId()
-                },
-                body: JSON.stringify({ 
-                    username, 
-                    email, 
-                    password, 
-                    userId: getClientId() 
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                msgDiv.innerText = '✅ Регистрация успешна! Теперь войдите.';
-                setTimeout(() => switchToLogin(), 1500);
-            } else {
-                msgDiv.innerText = `❌ ${data.error}`;
-            }
-        } catch (error) {
-            msgDiv.innerText = `❌ Ошибка: ${error.message}`;
-        }
-    }
-    
-    async function handleLogin() {
-        const username = document.getElementById('loginUsername').value.trim();
-        const password = document.getElementById('loginPassword').value;
-        const msgDiv = document.getElementById('authMessage');
-        
-        if (!username || !password) {
-            msgDiv.innerText = '❌ Введите имя пользователя и пароль!';
-            return;
-        }
-        
-        msgDiv.innerText = '⏳ Вход...';
-        
-        try {
-            const response = await fetch(`${BACKEND_URL}/login`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${BACKEND_TOKEN}`,
-                    'X-User-Id': getClientId()
-                },
-                body: JSON.stringify({ 
-                    username, 
-                    password, 
-                    userId: getClientId() 
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                currentUser = data.user;
-                localStorage.setItem('current_user', JSON.stringify(currentUser));
-                
-                document.getElementById('authModal').style.display = 'none';
-                document.getElementById('mainApp').style.display = 'block';
-                document.getElementById('userNameDisplay').innerText = currentUser.username;
-                document.getElementById('userBadge').innerHTML = `👤 ${currentUser.username}`;
-                
-                loadStats();
-                loadChatsLocal();
-                updateUniqueUsers();
-            } else {
-                msgDiv.innerText = `❌ ${data.error}`;
-            }
-        } catch (error) {
-            msgDiv.innerText = `❌ Ошибка: ${error.message}`;
-        }
-    }
-    
-    function switchToRegister() {
-        document.getElementById('loginForm').style.display = 'none';
-        document.getElementById('registerForm').style.display = 'block';
-        document.getElementById('authMessage').innerText = '';
-    }
-    
-    function switchToLogin() {
-        document.getElementById('registerForm').style.display = 'none';
-        document.getElementById('loginForm').style.display = 'block';
-        document.getElementById('authMessage').innerText = '';
-    }
-    
-    function logout() {
-        currentUser = null;
-        localStorage.removeItem('current_user');
-        document.getElementById('mainApp').style.display = 'none';
-        document.getElementById('authModal').style.display = 'flex';
-        document.getElementById('loginUsername').value = '';
-        document.getElementById('loginPassword').value = '';
-        document.getElementById('regUsername').value = '';
-        document.getElementById('regEmail').value = '';
-        document.getElementById('regPassword').value = '';
-        document.getElementById('authMessage').innerText = '';
-        switchToLogin();
-    }
-    
-    // Проверяем авторизацию
-    const savedUser = localStorage.getItem('current_user');
-    if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        document.getElementById('authModal').style.display = 'none';
-        document.getElementById('mainApp').style.display = 'block';
-        document.getElementById('userNameDisplay').innerText = currentUser.username;
-        document.getElementById('userBadge').innerHTML = `👤 ${currentUser.username}`;
-    }
-
     // ========== КОНФИГУРАЦИЯ ==========
+    const BACKEND_URL = 'https://round-firefly-edb2.inkodinoklapotkin.workers.dev';
+    const BACKEND_TOKEN = 'm5sticker-d1-secret-2024';
     const PROXY_URL = 'https://groq-proxybyinkodinok.inkodinoklapotkin.workers.dev';
     
+    let currentUser = null;
     let currentModel = 'llama-3.3-70b-versatile';
     let currentMode = 'general';
     let isGenerating = false;
@@ -443,18 +307,12 @@
     let responseStartTime = 0;
     
     let stats = {
-        messageCount: 0,
-        totalTokens: 0,
-        modelUsage: {},
-        uniqueUsers: [],
-        dailyMessages: {},
-        hourlyMessages: {},
-        topQueries: [],
-        responseTimes: []
+        messageCount: 0, totalTokens: 0, modelUsage: {}, uniqueUsers: [],
+        dailyMessages: {}, hourlyMessages: {}, topQueries: [], responseTimes: []
     };
-    
     let conversationHistory = [];
 
+    // DOM элементы
     const messagesContainer = document.getElementById('messagesContainer');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -466,7 +324,6 @@
     const testNotificationBtn = document.getElementById('testNotificationBtn');
     const notificationToggle = document.getElementById('notificationToggle');
     const notificationStatus = document.getElementById('notificationStatus');
-    
     const totalMsgStat = document.getElementById('totalMsgStat');
     const uniqueUsersStat = document.getElementById('uniqueUsersStat');
     const todayMsgStat = document.getElementById('todayMsgStat');
@@ -487,6 +344,164 @@
         creative: 'Ты креативный писатель. Генерируй идеи, пиши красиво.'
     };
 
+    function getClientId() {
+        let id = localStorage.getItem('client_id');
+        if (!id) {
+            id = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('client_id', id);
+        }
+        return id;
+    }
+
+    // ========== РЕГИСТРАЦИЯ ==========
+    async function handleRegister() {
+        const username = document.getElementById('regUsername').value.trim();
+        const email = document.getElementById('regEmail').value.trim();
+        const password = document.getElementById('regPassword').value;
+        const captcha = document.getElementById('captchaInput').value.trim();
+        const msgDiv = document.getElementById('authMessage');
+        
+        if (!username || !email || !password) {
+            msgDiv.innerText = '❌ Заполните все поля!';
+            return;
+        }
+        if (captcha !== '4') {
+            msgDiv.innerText = '❌ Неправильный ответ на капчу! 2 + 2 = 4';
+            return;
+        }
+        msgDiv.innerText = '⏳ Регистрация...';
+        
+        try {
+            const response = await fetch(`${BACKEND_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BACKEND_TOKEN}`, 'X-User-Id': getClientId() },
+                body: JSON.stringify({ username, email, password, userId: getClientId() })
+            });
+            const data = await response.json();
+            if (response.ok && data.requiresVerification) {
+                msgDiv.innerHTML = '✅ Код отправлен на почту!<br>Введите его ниже:';
+                document.getElementById('registerForm').style.display = 'none';
+                document.getElementById('verificationPanel').style.display = 'block';
+                document.getElementById('verifyEmail').value = email;
+            } else if (response.ok) {
+                msgDiv.innerText = '✅ Регистрация успешна! Теперь войдите.';
+                setTimeout(() => switchToLogin(), 1500);
+            } else {
+                msgDiv.innerText = `❌ ${data.error}`;
+            }
+        } catch (error) {
+            msgDiv.innerText = `❌ Ошибка: ${error.message}`;
+        }
+    }
+
+    async function verifyEmail() {
+        const email = document.getElementById('verifyEmail').value;
+        const code = document.getElementById('verifyCode').value.trim();
+        const msgDiv = document.getElementById('authMessage');
+        if (!email || !code) {
+            msgDiv.innerText = '❌ Введите email и код!';
+            return;
+        }
+        msgDiv.innerText = '⏳ Проверка кода...';
+        try {
+            const response = await fetch(`${BACKEND_URL}/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BACKEND_TOKEN}`, 'X-User-Id': getClientId() },
+                body: JSON.stringify({ email, code })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                msgDiv.innerText = '✅ Email подтверждён! Теперь войдите.';
+                setTimeout(() => switchToLogin(), 1500);
+            } else {
+                msgDiv.innerText = `❌ ${data.error}`;
+            }
+        } catch (error) {
+            msgDiv.innerText = `❌ Ошибка: ${error.message}`;
+        }
+    }
+
+    function cancelVerification() {
+        document.getElementById('verificationPanel').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'block';
+        document.getElementById('authMessage').innerText = '';
+        document.getElementById('verifyCode').value = '';
+    }
+
+    async function handleLogin() {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const msgDiv = document.getElementById('authMessage');
+        if (!username || !password) {
+            msgDiv.innerText = '❌ Введите имя пользователя и пароль!';
+            return;
+        }
+        msgDiv.innerText = '⏳ Вход...';
+        try {
+            const response = await fetch(`${BACKEND_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BACKEND_TOKEN}`, 'X-User-Id': getClientId() },
+                body: JSON.stringify({ username, password, userId: getClientId() })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                currentUser = data.user;
+                localStorage.setItem('current_user', JSON.stringify(currentUser));
+                document.getElementById('authModal').style.display = 'none';
+                document.getElementById('mainApp').style.display = 'block';
+                document.getElementById('userNameDisplay').innerText = currentUser.username;
+                document.getElementById('userBadge').innerHTML = `👤 ${currentUser.username}`;
+                loadStats();
+                loadChatsLocal();
+                updateUniqueUsers();
+            } else {
+                msgDiv.innerText = `❌ ${data.error}`;
+            }
+        } catch (error) {
+            msgDiv.innerText = `❌ Ошибка: ${error.message}`;
+        }
+    }
+
+    function switchToRegister() {
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'block';
+        document.getElementById('verificationPanel').style.display = 'none';
+        document.getElementById('authMessage').innerText = '';
+        document.getElementById('captchaInput').value = '';
+    }
+
+    function switchToLogin() {
+        document.getElementById('registerForm').style.display = 'none';
+        document.getElementById('verificationPanel').style.display = 'none';
+        document.getElementById('loginForm').style.display = 'block';
+        document.getElementById('authMessage').innerText = '';
+        document.getElementById('regUsername').value = '';
+        document.getElementById('regEmail').value = '';
+        document.getElementById('regPassword').value = '';
+        document.getElementById('captchaInput').value = '';
+        document.getElementById('verifyCode').value = '';
+    }
+
+    function logout() {
+        currentUser = null;
+        localStorage.removeItem('current_user');
+        document.getElementById('mainApp').style.display = 'none';
+        document.getElementById('authModal').style.display = 'flex';
+        document.getElementById('loginUsername').value = '';
+        document.getElementById('loginPassword').value = '';
+        switchToLogin();
+    }
+
+    const savedUser = localStorage.getItem('current_user');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        document.getElementById('authModal').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        document.getElementById('userNameDisplay').innerText = currentUser.username;
+        document.getElementById('userBadge').innerHTML = `👤 ${currentUser.username}`;
+    }
+
+    // ========== ЧАТ ==========
     async function requestNotificationPermission() {
         if (!('Notification' in window)) return false;
         if (Notification.permission === 'granted') return true;
@@ -567,11 +582,8 @@
     function addTopQuery(query) {
         let queries = JSON.parse(localStorage.getItem('top_queries') || '[]');
         const existing = queries.find(q => q.text === query);
-        if (existing) {
-            existing.count++;
-        } else {
-            queries.push({ text: query.substring(0, 100), count: 1 });
-        }
+        if (existing) { existing.count++; } 
+        else { queries.push({ text: query.substring(0, 100), count: 1 }); }
         queries.sort((a, b) => b.count - a.count);
         if (queries.length > 20) queries.pop();
         localStorage.setItem('top_queries', JSON.stringify(queries));
@@ -604,29 +616,16 @@
             container.innerHTML = '<div style="opacity: 0.6;">Нет данных</div>';
             return;
         }
-        container.innerHTML = stats.topQueries.slice(0, 10).map(q => 
-            `<div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 4px 0; border-bottom: 0.5px solid rgba(255,255,255,0.05);">
-                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;">${escapeHtml(q.text.substring(0, 40))}</span>
-                <span style="color: #a5b4fc;">${q.count}✕</span>
-            </div>`
-        ).join('');
+        container.innerHTML = stats.topQueries.slice(0, 10).map(q => `<div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 4px 0; border-bottom: 0.5px solid rgba(255,255,255,0.05);"><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;">${escapeHtml(q.text.substring(0, 40))}</span><span style="color: #a5b4fc;">${q.count}✕</span></div>`).join('');
     }
 
     function renderHourlyActivity() {
         const container = document.getElementById('hourlyActivity');
         if (!container) return;
         const hours = Array(24).fill(0);
-        Object.entries(stats.hourlyMessages).forEach(([hour, count]) => {
-            hours[parseInt(hour)] = count;
-        });
+        Object.entries(stats.hourlyMessages).forEach(([hour, count]) => { hours[parseInt(hour)] = count; });
         const maxCount = Math.max(...hours, 1);
-        container.innerHTML = hours.map((count, hour) => `
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                <div style="width: 24px; height: ${Math.max(20, (count / maxCount) * 50)}px; background: #6366f1; border-radius: 4px;"></div>
-                <span style="font-size: 0.6rem;">${hour}:00</span>
-                <span style="font-size: 0.6rem; opacity: 0.6;">${count}</span>
-            </div>
-        `).join('');
+        container.innerHTML = hours.map((count, hour) => `<div style="display: flex; flex-direction: column; align-items: center; gap: 4px;"><div style="width: 24px; height: ${Math.max(20, (count / maxCount) * 50)}px; background: #6366f1; border-radius: 4px;"></div><span style="font-size: 0.6rem;">${hour}:00</span><span style="font-size: 0.6rem; opacity: 0.6;">${count}</span></div>`).join('');
     }
 
     function updateStatsUI() {
@@ -669,14 +668,8 @@
     function resetStats() {
         if (confirm('⚠️ ВНИМАНИЕ! Это удалит всю статистику. Продолжить?')) {
             stats = {
-                messageCount: 0,
-                totalTokens: 0,
-                modelUsage: {},
-                uniqueUsers: [],
-                dailyMessages: {},
-                hourlyMessages: {},
-                topQueries: [],
-                responseTimes: []
+                messageCount: 0, totalTokens: 0, modelUsage: {}, uniqueUsers: [],
+                dailyMessages: {}, hourlyMessages: {}, topQueries: [], responseTimes: []
             };
             localStorage.removeItem('ai_stats');
             localStorage.removeItem('all_users');
@@ -698,15 +691,10 @@
         updateHourlyStats();
         updateStatsUI();
         saveStats();
-        
         if (currentUser) {
             fetch(`${BACKEND_URL}/update-stats`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${BACKEND_TOKEN}`,
-                    'X-User-Id': getClientId()
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BACKEND_TOKEN}`, 'X-User-Id': getClientId() },
                 body: JSON.stringify({ username: currentUser.username, messageCount: 1, userId: getClientId() })
             }).catch(e => console.log('Статистика не обновлена'));
         }
@@ -714,41 +702,21 @@
 
     async function callGroq(messages) {
         const userId = currentUser ? currentUser.username : getUserId();
-        
         const response = await fetch(PROXY_URL, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer m5sticker-super-secret-2024-xk9j2m7',
-                'X-Request-Timestamp': Date.now().toString(),
-                'X-User-Id': userId
-            },
-            body: JSON.stringify({ 
-                model: currentModel, 
-                messages: messages, 
-                temperature: 0.7, 
-                max_tokens: 1000,
-                userId: userId
-            })
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer m5sticker-super-secret-2024-xk9j2m7', 'X-Request-Timestamp': Date.now().toString(), 'X-User-Id': userId },
+            body: JSON.stringify({ model: currentModel, messages: messages, temperature: 0.7, max_tokens: 1000, userId: userId })
         });
-        
-        if (response.status === 429) {
-            throw new Error('Лимит запросов. Попробуйте через минуту.');
-        }
-        if (response.status === 401) {
-            throw new Error('Неверный токен доступа.');
-        }
-        if (response.status === 403) {
-            throw new Error('Доступ запрещён.');
-        }
+        if (response.status === 429) throw new Error('Лимит запросов. Попробуйте через минуту.');
+        if (response.status === 401) throw new Error('Неверный токен доступа.');
+        if (response.status === 403) throw new Error('Доступ запрещён.');
         if(!response.ok) throw new Error('Groq error');
-        
         const data = await response.json();
         stats.totalTokens += data.usage?.total_tokens || 0;
         saveStats();
         return data.choices[0].message.content;
     }
-    
+
     async function sendToAI(message) {
         const apiMessages = [
             { role: 'system', content: MODE_PROMPTS[currentMode] },
@@ -794,7 +762,6 @@
     async function sendMessage(customText) {
         let text = customText || userInput.value.trim();
         if(!text || isGenerating) return;
-        
         addMessage('user', text);
         userInput.value = '';
         autoResize();
@@ -802,7 +769,6 @@
         sendBtn.disabled = true;
         showLoading();
         responseStartTime = Date.now();
-        
         try {
             const reply = await sendToAI(text);
             const responseTime = Date.now() - responseStartTime;
@@ -915,19 +881,11 @@
     if(notificationToggle) notificationToggle.addEventListener('click', toggleNotifications);
     
     if(userInput) {
-        userInput.addEventListener('keydown', (e) => { 
-            if(e.key === 'Enter' && !e.shiftKey && !isGenerating) { 
-                e.preventDefault(); 
-                sendMessage(); 
-            } 
-        });
+        userInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.shiftKey && !isGenerating) { e.preventDefault(); sendMessage(); } });
         userInput.addEventListener('input', autoResize);
     }
     if(modelSelect) {
-        modelSelect.addEventListener('change', (e) => { 
-            currentModel = e.target.value; 
-            if(modelBadge) modelBadge.innerText = modelSelect.options[modelSelect.selectedIndex].text; 
-        });
+        modelSelect.addEventListener('change', (e) => { currentModel = e.target.value; if(modelBadge) modelBadge.innerText = modelSelect.options[modelSelect.selectedIndex].text; });
     }
     if(modeSelect) modeSelect.addEventListener('change', (e) => { currentMode = e.target.value; });
 
@@ -939,16 +897,13 @@
     }
     autoResize();
     
-    // Проверка соединения с бэкендом
     async function checkBackend() {
         try {
             const response = await fetch(`${BACKEND_URL}/ping`);
             const data = await response.json();
-            if (data.status === 'ok') {
-                console.log('✅ Бэкенд с D1 работает!');
-            }
+            if (data.status === 'ok') console.log('✅ Бэкенд работает!');
         } catch (error) {
-            console.log('⚠️ Бэкенд не отвечает, проверьте URL');
+            console.log('⚠️ Бэкенд не отвечает');
         }
     }
     checkBackend();
