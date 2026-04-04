@@ -82,6 +82,7 @@
         .chat-history-message { padding: 10px; margin: 8px 0; border-radius: 16px; background: rgba(20, 20, 30, 0.8); }
         .chat-history-user { color: #a5b4fc; font-weight: bold; }
         .chat-history-assistant { color: #10b981; }
+        .chat-history-model { font-size: 0.6rem; opacity: 0.6; margin-top: 4px; }
         .close-modal { background: #ef4444; border: none; color: white; padding: 8px 16px; border-radius: 30px; cursor: pointer; margin-top: 10px; }
         canvas { background: rgba(30, 30, 45, 0.5); border-radius: 16px; padding: 10px; width: 100%; height: auto; }
         .modal-overlay {
@@ -343,6 +344,27 @@
         return id;
     }
 
+    // ========== СОХРАНЕНИЕ СООБЩЕНИЙ В D1 ==========
+    async function saveMessageToDB(role, content, model) {
+        if (!currentUser) return;
+        try {
+            await fetch(`${BACKEND_URL}/save-message`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BACKEND_TOKEN}` },
+                body: JSON.stringify({
+                    username: currentUser.username,
+                    userId: currentUser.id,
+                    role: role,
+                    content: content,
+                    model: model || currentModel
+                })
+            });
+        } catch(e) {
+            console.log('Failed to save message to DB');
+        }
+    }
+
+    // ========== СОХРАНЕНИЕ ЧАТОВ ЛОКАЛЬНО ==========
     function saveChatsToLocal() {
         if (!currentUser) return;
         localStorage.setItem(`chat_${currentUser.id}`, JSON.stringify(conversationHistory));
@@ -585,25 +607,40 @@
         }
     }
     
-    function showUserChatHistory(username) {
-        const history = JSON.parse(localStorage.getItem(`chat_${username}`) || '[]');
+    async function showUserChatHistory(username) {
         const modal = document.getElementById('chatHistoryModal');
         const content = document.getElementById('chatHistoryContent');
         document.getElementById('historyUsername').innerText = username;
         
-        if (history.length === 0) {
-            content.innerHTML = '<div style="text-align:center; opacity:0.6;">Нет истории чатов</div>';
-        } else {
-            content.innerHTML = history.map(msg => `
-                <div class="chat-history-message">
-                    <div class="${msg.role === 'user' ? 'chat-history-user' : 'chat-history-assistant'}">
-                        <strong>${msg.role === 'user' ? '👤 Пользователь' : '🤖 AI'}:</strong>
-                    </div>
-                    <div style="margin-top: 5px;">${escapeHtml(msg.content).substring(0, 300)}${msg.content.length > 300 ? '...' : ''}</div>
-                </div>
-            `).join('');
-        }
+        content.innerHTML = '<div style="text-align:center;">⏳ Загрузка...</div>';
         modal.style.display = 'flex';
+        
+        try {
+            const response = await fetch(`${BACKEND_URL}/admin/chat-history?username=${encodeURIComponent(username)}`, {
+                headers: { 
+                    'Authorization': `Bearer ${BACKEND_TOKEN}`,
+                    'X-Admin-Key': ADMIN_USERNAME,
+                    'X-Admin-Secret': ADMIN_SECRET_KEY
+                }
+            });
+            const data = await response.json();
+            
+            if (data.history && data.history.length > 0) {
+                content.innerHTML = data.history.map(msg => `
+                    <div class="chat-history-message">
+                        <div class="${msg.role === 'user' ? 'chat-history-user' : 'chat-history-assistant'}">
+                            <strong>${msg.role === 'user' ? '👤 Пользователь' : '🤖 AI'}:</strong>
+                        </div>
+                        <div style="margin-top: 5px;">${escapeHtml(msg.content).substring(0, 500)}${msg.content.length > 500 ? '...' : ''}</div>
+                        <div class="chat-history-model">${msg.model || ''} • ${new Date(msg.timestamp).toLocaleString()}</div>
+                    </div>
+                `).join('');
+            } else {
+                content.innerHTML = '<div style="text-align:center; opacity:0.6;">📭 Нет истории чатов</div>';
+            }
+        } catch(e) {
+            content.innerHTML = '<div style="text-align:center; color:#ef4444;">❌ Ошибка загрузки истории</div>';
+        }
     }
     
     window.closeChatHistory = function() {
@@ -888,6 +925,7 @@
         conversationHistory.push({ role, content });
         if(conversationHistory.length > 50) conversationHistory.shift();
         saveChatsToLocal();
+        saveMessageToDB(role, content, currentModel);
     }
 
     let loadingDiv = null;
