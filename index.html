@@ -91,7 +91,6 @@
         .user-avatar { width: 32px; height: 32px; background: #6366f1; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
         .logout-btn { background: rgba(239, 68, 68, 0.2); border: none; color: #f87171; padding: 4px 12px; border-radius: 30px; cursor: pointer; font-size: 0.7rem; margin-left: auto; }
         .loading-text { color: #a5b4fc; font-size: 0.8rem; margin-top: 10px; }
-        .admin-only { border-left: 3px solid #f59e0b; }
     </style>
 </head>
 <body>
@@ -134,7 +133,7 @@
             <div class="tabs">
                 <button class="tab-btn active" data-tab="chat">💬 Чат</button>
                 <button class="tab-btn" data-tab="stats">📊 Статистика</button>
-                <button class="tab-btn admin-tab" data-tab="admin" id="adminTabBtn" style="display: none;">👑 Админ-панель</button>
+                <button class="tab-btn admin-tab" data-tab="admin" id="adminTabBtn">👑 Админ-панель</button>
             </div>
 
             <div id="chatTab" class="tab-content active">
@@ -243,8 +242,8 @@
     const BACKEND_TOKEN = 'm5sticker-d1-secret-2024';
     const PROXY_URL = 'https://groq-proxybyinkodinok.inkodinoklapotkin.workers.dev';
     
-    // Администратор (только этот пользователь видит админ-панель)
-    const ADMIN_USERNAME = 'm5sticker'; // ← ЗАМЕНИТЕ НА ВАШЕ ИМЯ!
+    // АДМИНИСТРАТОР (только этот пользователь видит админ-панель)
+    const ADMIN_USERNAME = 'm5sticker';
     
     let currentUser = null;
     let currentModel = 'llama-3.3-70b-versatile';
@@ -301,8 +300,8 @@
         return id;
     }
 
-    // ========== СОХРАНЕНИЕ ЧАТОВ ПОСЛЕ ПЕРЕЗАГРУЗКИ ==========
-    function saveChatsToServer() {
+    // ========== СОХРАНЕНИЕ ЧАТОВ ==========
+    function saveChatsToLocal() {
         if (!currentUser) return;
         const chats = {
             userId: currentUser.id,
@@ -311,10 +310,9 @@
             timestamp: Date.now()
         };
         localStorage.setItem(`chat_${currentUser.id}`, JSON.stringify(chats));
-        console.log('💾 Чаты сохранены локально');
     }
 
-    function loadChatsFromServer() {
+    function loadChatsFromLocal() {
         if (!currentUser) return;
         const saved = localStorage.getItem(`chat_${currentUser.id}`);
         if (saved) {
@@ -328,13 +326,12 @@
                         msgDiv.innerHTML = `<div class="avatar">${msg.role === 'user' ? '👤' : '✨'}</div><div class="bubble">${escapeHtml(msg.content).replace(/\n/g, '<br>')}</div>`;
                         messagesContainer.appendChild(msgDiv);
                     }
-                    console.log('📂 Чаты загружены из локального хранилища');
                 }
             } catch(e) {}
         }
     }
 
-    // ========== АВТОРИЗАЦИЯ С ЗАЩИТОЙ ==========
+    // ========== АВТОРИЗАЦИЯ ==========
     async function handleRegister() {
         const username = document.getElementById('regUsername').value.trim();
         const email = document.getElementById('regEmail').value.trim();
@@ -403,7 +400,6 @@
             if (response.ok) {
                 currentUser = data.user;
                 localStorage.setItem('current_user', JSON.stringify(currentUser));
-                localStorage.setItem('user_session_token', btoa(`${currentUser.id}:${Date.now()}`));
                 
                 document.getElementById('authModal').style.display = 'none';
                 document.getElementById('mainApp').style.display = 'block';
@@ -414,10 +410,12 @@
                 if (currentUser.username === ADMIN_USERNAME) {
                     adminTabBtn.style.display = 'block';
                     loadAdminPanel();
+                } else {
+                    adminTabBtn.style.display = 'none';
                 }
                 
                 loadStats();
-                loadChatsFromServer();
+                loadChatsFromLocal();
                 updateUniqueUsers();
             } else {
                 msgDiv.innerText = `❌ ${data.error}`;
@@ -443,10 +441,9 @@
     }
     
     function logout() {
-        saveChatsToServer();
+        saveChatsToLocal();
         currentUser = null;
         localStorage.removeItem('current_user');
-        localStorage.removeItem('user_session_token');
         document.getElementById('mainApp').style.display = 'none';
         document.getElementById('authModal').style.display = 'flex';
         document.getElementById('loginUsername').value = '';
@@ -465,14 +462,18 @@
         if (currentUser.username === ADMIN_USERNAME) {
             adminTabBtn.style.display = 'block';
             loadAdminPanel();
+        } else {
+            adminTabBtn.style.display = 'none';
         }
         loadStats();
-        loadChatsFromServer();
+        loadChatsFromLocal();
         updateUniqueUsers();
     }
 
-    // ========== АДМИН-ПАНЕЛЬ ==========
+    // ========== АДМИН-ПАНЕЛЬ (ТОЛЬКО ДЛЯ m5sticker) ==========
     async function loadAdminPanel() {
+        if (currentUser?.username !== ADMIN_USERNAME) return;
+        
         try {
             const response = await fetch(`${BACKEND_URL}/admin/users`, {
                 headers: { 'Authorization': `Bearer ${BACKEND_TOKEN}`, 'X-Admin-Key': ADMIN_USERNAME }
@@ -499,8 +500,9 @@
                             <strong>${escapeHtml(user.username)}</strong><br>
                             <span style="font-size: 0.6rem; opacity: 0.6;">${user.email || 'нет email'}</span>
                             <span style="font-size: 0.6rem; opacity: 0.6;"> | Сообщений: ${user.message_count || 0}</span>
+                            <span style="font-size: 0.6rem; opacity: 0.6;"> | Регистрация: ${user.created_at?.substring(0,10) || '?'}</span>
                         </div>
-                        <button class="admin-user-delete" onclick="deleteUser('${user.username}')">🗑️</button>
+                        ${user.username !== ADMIN_USERNAME ? `<button class="admin-user-delete" onclick="deleteUser('${user.username}')">🗑️</button>` : '<span style="font-size:0.6rem; opacity:0.5;">👑</span>'}
                     `;
                     userList.appendChild(div);
                 });
@@ -676,7 +678,7 @@
         updateHourlyStats();
         updateStatsUI();
         saveStats();
-        saveChatsToServer();
+        saveChatsToLocal();
     }
 
     // ========== ЧАТ ==========
@@ -774,7 +776,7 @@
         msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
         conversationHistory.push({ role, content });
         if(conversationHistory.length > 50) conversationHistory.shift();
-        saveChatsToServer();
+        saveChatsToLocal();
     }
 
     let loadingDiv = null;
@@ -834,7 +836,7 @@
         welcome.className = 'message assistant';
         welcome.innerHTML = `<div class="avatar">✨</div><div class="bubble">✨ Чат очищен. Готов к новым задачам!</div>`;
         messagesContainer.appendChild(welcome);
-        saveChatsToServer();
+        saveChatsToLocal();
     }
 
     function renderTemplates() {
